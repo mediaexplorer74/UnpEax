@@ -6,7 +6,7 @@ using System.IO.MemoryMappedFiles;
 using System.Threading.Tasks;
 using System.Xml;
 
-namespace UnpEax.App
+namespace UnpEax
 {
     /// <summary>
     /// UnpEax, for extracting (but not decrypting) EAppX/EAppXBundle/EMsiX/EMsiXBundle files
@@ -16,10 +16,28 @@ namespace UnpEax.App
     {
         static async Task Main(string[] args)
         {
-            // Path to file
-            var path = @"";
-            using var mmap = MemoryMappedFile.CreateFromFile(path, FileMode.Open);
-            Extract(mmap, Path.ChangeExtension(path, null), "");
+            
+            if (args.Length > 0)
+            {
+                // Path to file
+                string path = args[0]; //@"test.appx";
+                try
+                {
+                    using var mmap = MemoryMappedFile.CreateFromFile(path, FileMode.Open);
+
+                    Extract(mmap, Path.ChangeExtension(path, null), "");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error: " + ex.Message);
+                }
+
+                
+            }
+            else
+            {
+                Console.WriteLine("Usage: unpeax.exe <file>");
+            }
         }
 
         static Stream ReadData(MemoryMappedFile mmap, long offset, long count, bool unzip = false)
@@ -81,24 +99,28 @@ namespace UnpEax.App
 
             using var header_view = mmap.CreateViewAccessor(offset, header_size);
             long pos = 6;
+
             Func<Int64> ReadInt64 = () =>
             {
                 var ret = header_view.ReadInt64(pos);
                 pos += 8;
                 return ret;
             };
+
             Func<Int32> ReadInt32 = () =>
             {
                 var ret = header_view.ReadInt32(pos);
                 pos += 4;
                 return ret;
             };
+
             Func<Int16> ReadInt16 = () =>
             {
                 var ret = header_view.ReadInt16(pos);
                 pos += 2;
                 return ret;
             };
+
             Func<int, byte[]> ReadBytes = count =>
             {
                 var data = new byte[count];
@@ -106,7 +128,11 @@ namespace UnpEax.App
                 pos += count;
                 return data;
             };
-            Func<int, string> ReadString = count => { return System.Text.Encoding.Unicode.GetString(ReadBytes(count)); };
+
+            Func<int, string> ReadString = count => 
+            { 
+                return System.Text.Encoding.Unicode.GetString(ReadBytes(count)); 
+            };
 
             // See: https://pastebin.com/zH5tet0b
             var file_version = ReadInt64();
@@ -173,16 +199,16 @@ namespace UnpEax.App
             {
                 long p_offset = i * 40;
                 parts.Add(new Part()
-                          {
-                              id = parts_acc.ReadInt32(p_offset       + 8),
-                              flags = parts_acc.ReadInt16(p_offset    + 4),
-                              zipped = parts_acc.ReadInt16(p_offset   + 6),
-                              pos = parts_acc.ReadInt64(p_offset      + 16),
-                              len_orig = parts_acc.ReadInt64(p_offset + 24),
-                              len = parts_acc.ReadInt64(p_offset      + 32),
-                              path = "part" + i.ToString() + ".dat",
-                              isPackage = false,
-                          });
+                {
+                    id = parts_acc.ReadInt32(p_offset       + 8),
+                    flags = parts_acc.ReadInt16(p_offset    + 4),
+                    zipped = parts_acc.ReadInt16(p_offset   + 6),
+                    pos = parts_acc.ReadInt64(p_offset      + 16),
+                    len_orig = parts_acc.ReadInt64(p_offset + 24),
+                    len = parts_acc.ReadInt64(p_offset      + 32),
+                    path = "part" + i.ToString() + ".dat",
+                    isPackage = false,
+                });
             }
 
             if (parts.Count > 0)
